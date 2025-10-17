@@ -16,6 +16,8 @@ Check these out if your questions aren't directly about using the library as a d
 - [Can I call SDL video functions from multiple threads?](#video_on_threads)
 - [Can I call SDL event functions from multiple threads?](#events_on_threads)
 - [Why is my sleep/SDL-Delay function inaccurate? (Why am I getting 61/62/59 fps and not 60?):](#inaccurate_sleep)
+- [Why is my input jerky?](#key_repeat)
+- [Why am I getting undefined reference errors for SDL functions when I'm linking SDL?](#mingw_wrong_arch)
 - [I'm getting an error about SDL_main, WinMain, main, etc:](#main)
 - [Why is my window not rendering while the Window is being resized or dragged/moved?](#frozen_window)
 - [Graphics](#graphics)
@@ -30,7 +32,7 @@ Check these out if your questions aren't directly about using the library as a d
 
 ## How do I do X? Is Y broken? (I couldn't find it on this page!) <a name="cant_find_answer" id="cant_find_answer"></a>
 
-If something isn't covered here, it doesn't mean we don't know about it! It's difficult to collate everything between bugs, intended but perhaps unexpected behavior, and even many Frequently Asked Questions.
+If something isn't covered here, or an answer doesn't cover your case, it doesn't mean we don't know about it! It's difficult to collate everything between bugs, intended but perhaps unexpected behavior, and even many Frequently Asked Questions.
 
 When looking to do something, generally the first place to look is the [Category the API you're looking for is likely in](APIByCategory.md). If it has to do with a specific function, check the documentation for that, specifically the remarks section, there's fantastic information in those sections. If you still can't figure it out, SDL has several communities you can connect with to get help!
 
@@ -69,6 +71,32 @@ In SDL3 you should be using [`SDL_DelayPrecise`](SDL_DelayPrecise)  (which uses 
 
 On a similar note, when doing timing, prefer using [`SDL_GetPerformanceCounter`](SDL_GetPerformanceCounter)  and [`SDL_GetPerformanceFrequency`](SDL_GetPerformanceFrequency) , or [`SDL_GetTicksNS`](SDL_GetTicksNS) , over using [`SDL_GetTicks`](SDL_GetTicks), which has only has millisecond precision. [`SDL_GetTicksNS`](SDL_GetTicksNS) uses [`SDL_GetPerformanceCounter`](SDL_GetPerformanceCounter) under the hood, but converted to nanoseconds for convenience.
 
+
+## Why is my movement jerky/only happening when I move my mouse? <a name="key_repeat" id="key_repeat"></a>
+
+There's several possibilities for seeing this behavior, broadly though in terms of early SDL usage they tend to relate to Events. To put it simply Events come in when they come in. You cannot rely on them to come every frame, and you cannot rely on them to not come many times per frame.
+
+### (Only) Rendering during the [SDL_PollEvent](SDL_PollEvent) loop/while SDL_AppEvent is called.
+
+This typically takes the form of rendering at the bottom of the PollEvent loop when finished with the given event. This ends up rendering only when events are coming in and can cause all kinds of weird things to be displayed including jerky movement. It's also most obvious if you have something like an animation that constantly changes but it suddenly stops when you stop feeding it input/events.
+
+Occationally people render during specific events, which can also cause oddities if you're not careful. Which is not to say you never should, for example [SDL_EVENT_WINDOW_EXPOSE](SDL_EVENT_WINDOW_EXPOSE) is sent specifically for that.
+
+The solution is to ensure that (in general) all of your rendering happens outside the [SDL_PollEvent](SDL_PollEvent) loop or within [SDL_AppIterate](SDL_AppIterate).
+
+### Position calculation within the [SDL_PollEvent](SDL_PollEvent) loop/while SDL_AppEvent is called.
+
+It's not uncommon to see positional/movement recalculation to happen while processing events. Note that we mean the actual object position here, and not just calculation of a persistant direction vector. Typically this is in the form of calculating it during a switch/case or if/else chain that looks at each event in sequence. Depending on the type of input, this can result in movement only happening when you first press the button down, or to get jerky movement that starts, pauses for a moment, and then proceeds with very "chunky" rather than smooth movement. The latter is usually caused by Key Repeat on Keyboards, see the note below for more information.
+
+> __Note__: Approaches for input can be found here [Events, States, and Key Repeats](EventsStatesAndRepeats), as well as more information on Key Repeat.
+
+In general you want to be only adjusting direction in events, rather than applying it. You can also use states outside of events if prefer it.
+
+## Why am I getting undefined reference errors for SDL functions when I'm linking SDL? <a name="mingw_wrong_arch" id="mingw_wrong_arch"></a>
+
+If you're using gcc on windows, you may also know it as mingw, and you've confirmed your command line/build system is linking to SDL3, it's likely this is an architecture issue. It's common for folks to download the development distribution of SDL, pick one of the subfolders with 64bit or 32bit libaries, put them into a libs folder and linking to that. If the architecture doesn't match the one their compiler is targetting, it will silently fail to load the library and just report undefined reference errors. The "Other Distributions" section of the [mingw intro](https://github.com/libsdl-org/SDL/blob/main/docs/INTRO-mingw.md#other-distributions) covers downloading and identifying what you need.
+
+If you're not on Windows with mingw, or if you've confirmed the architecture is correct, it's likely your link order is wrong. This [Stack Overflow](https://stackoverflow.com/a/409470) answer explains it well.
 
 ## I'm getting an error about SDL_main, WinMain, main, etc: <a name="main" id="main"></a>
 

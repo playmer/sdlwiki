@@ -14,6 +14,7 @@
 ## Input
 
 - [Best Keyboard Practices](BestKeyboardPractices): How to do keyboard input _perfectly_ with SDL3.
+- [Events, States, and Key Repeats](EventsStatesAndRepeats): An extension of the above article, discussing how we use that input with Events and States as well as issues you may run into.
 
 If you come across good articles, please click [edit](https://wiki.libsdl.org/SDL3/Articles/edit) and add them!
 

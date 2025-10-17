@@ -6,40 +6,19 @@ Keyboard input is a surprisingly complicated topic after you step outside of you
 
 Almost any game, no matter what approach it is taking, should probably offer a means for users to configure key bindings; not only will this solve concerns about what kind of keyboard a user is typing on, it will also make your game flexible to whatever is _most comfortable_ for a user. This is not just a question of keyboard layouts, but being kind to those that don't have full motion of their hands and would benefit from moving keys to accessible locations that don't make obvious sense to an outside observer. At least offer a config file, if not a user interface; people you've never met will thank you for it!
 
-
 ## The four approaches
 
 There are, as far as we can tell, four common ways that apps want to use keyboard input. Sometimes they want different approaches at different moments, too.
 
 ## The 101-Button Joystick
 
+> __Note__: For more detailed information on using the keyboard in this manner, as well as gotchas you may run into, visit [Events, States, and Key Repeats](EventsStatesAndRepeats).
+
 Many games just want to treat a keyboard not as a way to input text, but just as a joystick that has a _lot_ of buttons. The well-known ["WASD" key pattern](https://en.wikipedia.org/wiki/WASD_keys) for FPS games is a fine example of this: you want the _physical_ location of a key, regardless of what symbol is printed on the key. After all, on a French keyboard, instead of "WASD", you'd press "ZQSD", and on a Hiragana keyboard "てちとし". Same locations on the keyboard, totally different symbols.
 
 For these, you want [SDL_Scancodes](SDL_Scancode): these are guaranteed to reference the physical location on the keyboard and not what is printed on it.
 
 Specifically, they assume a US English QWERTY keyboard layout, no matter what the keyboard in use actually has at that location, but that's okay because here we just want physical location of the key, not its meaning.
-
-### Events vs States
-
-When dealing with the buttons of joysticks, mice, and keyboards, it's common that people reach first for events. This document is mostly concerned with them as well as they apply to all of the approaches we'll cover. That said it's important to understand the differences here, as you may run into undesirable if you don't choose wisely. 
-
-Conceptually, Events are a way for the OS or SDL to inform you something has happened. You don't necessarily _always_ want to react to this information immediately. Consider when the player is moving forward, moving the character is, in most games, going to require per-frame work. So frame to frame, you'll need to know the user is pressing the button. Button events, regardless if they're Keyboard/Mouse/Gamepad/Joystick, don't get sent every frame, although they do get repeated, which we'll discuss down below. This can make it appear as though a character is continuously moving, but it will be jerky and there will be a big delay towards the beginning.
-
-Of course, there's still cases where you might want to use events, but they're typically singular actions. You can know when someone has pressed down on a button to try to do an action, and then you can choose to either immediately adjust state, or set a flag to evaluate the input later in the frame.
-
-On the other hand States, in the context of input, represent what we last saw when we finished processing events. These are great when we may receive contradictory input and we want to evaluate all relevant state before proceeding with your game logic. They're also useful for continuous input, like movement. 
-
-We'll demonstrate both methods below.
-
-#### A Note on Key Repeat
-
-As mentioned above, key events are not sent every frame. There's no real way for SDL to do this for us if you're using something like [`SDL_PollEvent`](SDL_PollEvent), as it has no idea when your frame starts and ends. Despite that, we do get repeated key event periodically. These repeats are sent by the OS, and typically there's two types of delays between these events. The first type is for the first repeat event. It's typically a little longer, something like ~1s, and then the OS will start sending them at some interval, something like ~200ms. These numbers are fuzzy as this is generally user configurable and dependent on the OS.
-
-Also mentioned above is that using events for something like movement often results in jerky movement, and indeed, this is due to the delays discussed above. You can mimic the jerky cadence by putting a cursor into a simple text editor and holding it down. The intervals you see as the characters appear is what the key repeat looks like on your system.
-
-### Using them in practice
-
-#### States
 
 For states you check during the gameloop, you can retrieve the state of the keyboard via [`SDL_GetKeyboardState`](SDL_GetKeyboardState). This will give you an array of boolean values representing if a button is up (`false`), or down (`true`), indexed by [`SDL_Scancodes`](SDL_Scancode). There's no need to worry about the lifetime, SDL owns this array, but you may want to cache it in practice, just so you don't have to call into SDL all the time.
 
@@ -64,29 +43,6 @@ int direction_user_should_move()
     /* (In practice it's likely you'd be doing full directional input in here, but for simplicity, we're just showing forward and backward) */
 
     return direction;  /* wasn't key in W or S location, don't move. */
-}
-```
-
-#### Events
-
-On the contrary, you might want to initiate an action from events, setting your own state from them that you process in your game loop.
-
-Simply grab the `scancode` field from [SDL_EVENT_KEY_DOWN](SDL_EVENT_KEY_DOWN) and [SDL_EVENT_KEY_UP](SDL_EVENT_KEY_UP) events.
-
-```c
-enum Action { ACTION_NONE, ACTION_RELOAD, ACTION_JUMP };
-
-/* returns ACTION_RELOAD if reloading with this keypress, ACTION_JUMP if jumping, ACTION_NONE if no actions were attempted. */
-Action action_user_should_take(const SDL_Event *e)
-{
-    SDL_assert(e->type == SDL_EVENT_KEY_DOWN); /* just checking key presses here... */
-    if (e->key.scancode == SDL_SCANCODE_R) {
-        return ACTION_RELOAD;  /* pressed what would be "R" on a US QWERTY keyboard. Reload! */
-    } else if (e->key.scancode == SDL_SCANCODE_SPACE) {
-        return ACTION_JUMP;  /* pressed what would be "Space" on a US QWERTY keyboard. Jump! */
-    }
-
-    return ACTION_NONE;  /* wasn't key in W or S location, don't move. */
 }
 ```
 
